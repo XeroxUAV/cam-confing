@@ -1,0 +1,21 @@
+# Reference template for XeroxUAV Backend runtime configuration.
+# Copy to `configs/backend.toml` (git-ignored) if you want local overrides;
+# otherwise the backend creates `configs/backend.toml` automatically on first run.
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[mediamtx]
+# Leave empty ("") when MediaMTX runs on the same laptop as this backend;
+# the browser will automatically use the current hostname with `webrtc_http_port`.
+public_host = ""
+rtsp_port = 8554
+webrtc_http_port = 8889
+stream_path = "cam"
+
+[stream]
+resolution = "960x600"
+fps_hz = 30
+bitrate_kbps = 2000
+encoder_kind = "software_x264"
