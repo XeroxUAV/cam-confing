@@ -1,193 +1,41 @@
-# کانفیگوریتور پایه تصویر زنده — XeroxUAV
+# XeroxUAV Live Camera Configurator — Base Setup
 
-این مخزن یک ابزار ساده و کامل برای **دیدن تصویر زنده دوربین کوادکوپتر در مرورگر** است. هدفش یک چیز است: هر عضو تیم بتواند بدون نصب هیچ برنامه‌ای، فقط با باز کردن یک آدرس اینترنتی در مرورگر لپ‌تاپ یا موبایل، تصویر زنده پرنده را با تأخیر زیر یک ثانیه ببیند.
+A small, self-contained tool that shows the quadcopter's **live camera feed in a web browser** with sub-second latency, over a plain local network (LAN cable or phone hotspot) — **no internet required**.
 
-اگر هیچ‌چیز از وب، پایتون یا شبکه نمی‌دانی، جای درستی آمده‌ای: این راهنما از صفر مطلق شروع می‌کند و برای هر دستور می‌گوید کجا اجرا شود و چه خروجی‌ای باید ببینی.
+Teammates do not install anything: they open one URL and watch the video.
 
-> **قانون طلایی پروانه‌ها (Golden Propeller Rule):** در تمام مراحل این راهنما، ملخ‌ها باید **فیزیکی جدا** باشند. هیچ تست نرم‌افزاری با کوادکوپترِ مسلح انجام نمی‌شود.
+> **فارسی:** برای راهنمای فارسی [`README.fa.md`](README.fa.md) را بخوان.
+>
+> **Golden Propeller Rule:** propellers must be physically **removed** during every software setup, bench test, and debugging session described here.
 
 ---
 
-## فهرست سریع
+## Contents
 
-| اگر تو… | برو به |
+| I want to… | Go to |
 | :--- | :--- |
-| فقط می‌خواهی تصویر را ببینی | [بخش ۸](#۸-آدرسی-که-به-بقیه-تیم-می-دهی) |
-| لپ‌تاپ ایستگاه زمینی را راه می‌اندازی | [بخش ۴](#۴-آماده-سازی-یک-باره-روی-لپ-تاپ-ویندوز) |
-| رزبری‌پای و دوربین را وصل می‌کنی | [بخش ۵](#۵-آماده-سازی-یک-باره-روی-رزبری-پای) |
-| می‌خواهی هر جلسه سیستم را روشن کنی | [بخش ۶](#۶-روشن-کردن-سیستم-در-هر-جلسه) |
-| چیزی کار نمی‌کند | [بخش ۱۱](#۱۱-عیب-یابی) |
+| Start the system right now (everything already installed) | [Quick Start](#1-quick-start) |
+| Set up a fresh laptop or Raspberry Pi | [One-time setup](#3-one-time-setup) |
+| Change resolution / fps / bitrate | [Configuration](#4-configuration) |
+| Fix something that is broken | [Troubleshooting](#7-troubleshooting) |
 
 ---
 
+## 1. Quick Start
 
-## ۱. سه نقش در تیم
+Everything below assumes the one-time setup in [section 3](#3-one-time-setup) is already done on the machines
+(`uv`, `MediaMTX`, project files, GStreamer, firewall rules).
 
-| نقش | کیست؟ | چه چیزی لازم دارد؟ | خروجی کارش |
-| :--- | :--- | :--- | :--- |
-| **الف) ایستگاه زمینی** | کسی که لپ‌تاپ ویندوز را روشن می‌کند | لپ‌تاپ ویندوز + فایل‌های این مخزن + اینترنت فقط برای نصب اولیه | یک آدرس (URL) که به بقیه می‌دهد |
-| **ب) فرستنده تصویر** | کسی که رزبری‌پای و دوربین را وصل می‌کند | رزبری‌پای ۴ + دوربین Arducam روی **پورت آبی USB 3.0** + کابل LAN یا هات‌اسپات | تصویر را به ایستگاه زمینی می‌فرستد |
-| **ج) بیننده** | هر کس دیگر در تیم | فقط یک مرورگر (Chrome / Edge / Firefox) روی همان شبکه | آدرس را باز می‌کند و تصویر را زنده می‌بیند |
+Open **three terminals**: two PowerShell windows on the Windows laptop and one SSH session on the Raspberry Pi.
 
-نقش «ج» نیازی به نصب هیچ برنامه‌ای ندارد.
-
----
-
-## ۲. تصویر بزرگ در ۳۰ ثانیه
-
-```text
-[رزبری‌پای + دوربین]                 [لپ‌تاپ ویندوز - ایستگاه زمینی]            [مرورگر تیم]
-دوربین (تصویر خام)                    ┌───────────────────────────┐
-      │                               │  سرور رسانه (MediaMTX)    │
-      ▼                               │  8554 ← ورودی تصویر       │
-فشرده‌سازی H.264 ──── شبکه ─────────► │  8889 ← خروجی برای مرورگر │ ──► تصویر زنده در مرورگر
-                                      └───────────────────────────┘
-                                                   ▲
-                                                   │
-                                      بک‌اند وب (پورت 8080)
-                                      · صفحه وب را به مرورگر می‌دهد
-                                      · تنظیمات تصویر را نگه می‌دارد
-```
-
-- **مسیر تصویر:** دوربین → فشرده‌سازی روی رزبری‌پای → ارسال به لپ‌تاپ → پخش در مرورگر.
-- **مسیر مدیریت:** مرورگر، صفحه وب و تنظیمات را از بک‌اند روی پورت `8080` می‌گیرد.
-
----
-
-## ۳. واژه‌نامه ۶ کلمه‌ای
-
-۱. **`MediaMTX` (سرور رسانه):** برنامه‌ای تک‌فایلی روی لپ‌تاپ که مثل یک «ایستگاه پخش تلویزیونی» عمل می‌کند؛ تصویر را از رزبری‌پای تحویل می‌گیرد و هم‌زمان به چند مرورگر پخش می‌کند.
-
-۲. **`RTSP`:** زبان استاندارد فرستادن ویدیو به سرور رسانه. برای ما فقط یعنی «آدرسی شبیه `rtsp://<آی‌پی>:8554/cam`».
-
-۳. **`WebRTC / WHEP`:** فناوری‌ای که تصویر را در **کمتر از چند دهم ثانیه** در مرورگر نشان می‌دهد. مرورگر یک درخواست کوتاه به آدرس `WHEP` می‌فرستد و بعد تصویر را مستقیم می‌گیرد.
-
-۴. **`بک‌اند` (FastAPI):** برنامه پایتونی روی لپ‌تاپ که صفحه وب را روی `http://<آی‌پی>:8080/` سرو می‌کند و تنظیمات (رزولوشن، نرخ فریم، بیت‌ریت) را در یک فایل متنی ذخیره می‌کند.
-
-۵. **`uv`:** ابزار کمکی که تمام کتابخانه‌های پایتون پروژه را با یک دستور نصب می‌کند و دستورهای `xerox-cam-backend` و `xerox-cam-push` را در دسترس می‌گذارد. فقط بار اول نصب می‌شود.
-
-۶. **`IP` (آی‌پی):** نشانی لپ‌تاپ در شبکه محلی؛ مثلاً `192.168.1.37`. بقیه با همین نشانی به صفحه وب وصل می‌شوند. این عدد با عوض شدن شبکه تغییر می‌کند، پس هر جلسه آن را از روی لپ‌تاپ بخوان و آن را در هیچ فایلی ذخیره نکن.
-
----
-
-## ۴. آماده‌سازی یک‌باره روی لپ‌تاپ ویندوز
-
-> این بخش فقط بار اول لازم است؛ از جلسه‌ی بعد مستقیم برو به [بخش ۶](#۶-روشن-کردن-سیستم-در-هر-جلسه).
-
-### ۴-۱: دریافت فایل‌های این مخزن
-
-در صفحه این مخزن در گیت‌هاب دکمه **`Code` → `Download ZIP`** را بزن و فایل را در جایی مثل
-`C:\Users\<نام کاربری>\Documents\configurator` از حالت فشرده خارج کن.
-در تمام ادامه فرض می‌کنیم پروژه همین‌جاست؛ پس اولِ هر پنجره PowerShell این را بزن:
+### Step 1 — Start the media server (laptop, PowerShell window #1)
 
 ```powershell
-cd C:\Users\<نام کاربری>\Documents\configurator
-```
-
-### ۴-۲: نصب `uv`
-
-یک **PowerShell معمولی** باز کن:
-
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-پنجره را **ببند و دوباره باز کن** و نصب را بررسی کن:
-
-```powershell
-uv --version
-```
-
-**خروجی مورد انتظار:** یک شماره نسخه، مثلاً `uv 0.9.x`.
-
-### ۴-۳: نصب کتابخانه‌های پروژه
-
-```powershell
-uv sync --locked --dev
-```
-
-**خروجی مورد انتظار:** چند خط `Installed ...` و پایان سبزرنگ. این دستور فقط بار اول اینترنت مصرف می‌کند؛ بعد از آن کاملاً آفلاین کار می‌کند.
-
-### ۴-۴: دانلود سرور رسانه (`MediaMTX`)
-
-```powershell
-New-Item -ItemType Directory -Force -Path .\bin | Out-Null
-Invoke-WebRequest -Uri "https://github.com/bluenviron/mediamtx/releases/download/v1.21.3/mediamtx_v1.21.3_windows_amd64.zip" -OutFile .\bin\mediamtx.zip
-Expand-Archive -Force -Path .\bin\mediamtx.zip -DestinationPath .\bin
-Unblock-File -Path .\bin\mediamtx.exe
-.\bin\mediamtx.exe --version
-```
-
-**خروجی مورد انتظار خط آخر:** `v1.21.3`
-(اگر ویندوز پنجره آبی «Windows protected your PC» نشان داد، روی **More info** و بعد **Run anyway** بزن.)
-
-### ۴-۵: باز کردن پورت‌ها در فایروال ویندوز
-
-یک PowerShell را **با دسترسی مدیر (Run as Administrator)** باز کن و این دو دستور را اجرا کن:
-
-```powershell
-New-NetFirewallRule -DisplayName "XeroxUAV Camera TCP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8554,8888,8889,8080 -Profile Any
-New-NetFirewallRule -DisplayName "XeroxUAV Camera UDP" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 8000,8001,8189 -Profile Any
-```
-
-**خروجی مورد انتظار:** جدول کوتاهی که در آن `Enabled : True` و `Action : Allow` دیده می‌شود.
-
-پورت `8080` مخصوص صفحه وب است و `-Profile Any` یعنی حتی اگر ویندوز شبکه هات‌اسپات را «Public» تشخیص بدهد باز هم اجازه ورود می‌دهد. حالا پنجره Administrator را ببند.
-
----
-
-## ۵. آماده‌سازی یک‌باره روی رزبری‌پای
-
-### ۵-۱: بررسی دوربین
-
-با SSH وارد رزبری‌پای شو (`ssh xerox@XeroxUAV`) و بزن:
-
-```bash
-v4l2-ctl --device=/dev/video1 --list-formats-ext
-```
-
-**خروجی مورد انتظار:** دیدن `'YUYV'` با ابعاد `960x600` (تا `80.000 fps`) و `1920x1200` (تا `50.000 fps`).
-اگر فقط `960x600 @ 10.000 fps` دیدی، یعنی دوربین روی یک پورت مشکی USB 2.0 افتاده است؛ کابل را محکم به یک **پورت آبی USB 3.0** منتقل کن و دوباره امتحان کن.
-
-اگر ابزارها یا پلاگین‌ها نصب نبودند، یک بار این را بزن:
-
-```bash
-sudo apt update && sudo apt install -y v4l-utils gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-rtsp
-```
-
-### ۵-۲: انتقال کد پروژه به رزبری‌پای
-
-از PowerShell لپ‌تاپ، همان زیپی را که از گیت‌هاب گرفتی بفرست:
-
-```powershell
-scp "$HOME\Downloads\real_time_cam.zip" xerox@XeroxUAV:~/
-```
-
-و در SSH رزبری‌پای:
-
-```bash
-mkdir -p ~/projects/real_time_cam
-tar -xzf ~/real_time_cam.zip -C ~/projects/real_time_cam --strip-components=1
-cd ~/projects/real_time_cam
-uv sync --dev
-```
-
-**خروجی مورد انتظار:** پیام `Installed ... packages`؛ بعد از آن دستور `uv run xerox-cam-push --help` باید بدون خطا اجرا شود.
-
----
-
-## ۶. روشن کردن سیستم در هر جلسه
-
-ترتیب را رعایت کن: **اول سرور رسانه، دوم ارسال تصویر، سوم بک‌اند**، و در پایان مرورگر را باز کن.
-
-### ۶-۱ (لپ‌تاپ، پنجره PowerShell شماره ۱): روشن کردن سرور رسانه
-
-```powershell
-cd C:\Users\<نام کاربری>\Documents\configurator
+cd C:\Users\<username>\Documents\configurator
 .\bin\mediamtx.exe .\configs\mediamtx.yml
 ```
 
-**خروجی مورد انتظار (۵ خط):**
+Expected output (5 lines):
 
 ```text
 INF MediaMTX v1.21.3, windows, amd64
@@ -197,309 +45,265 @@ INF [HLS] started with listener on :8888 (TCP/HTTP)
 INF [WebRTC] started with listeners on :8889 (TCP/HTTP), :8189 (UDP/ICE)
 ```
 
-این پنجره را **باز نگه دار**؛ پیام‌های زنده را همین‌جا می‌بینی.
+Keep this window open.
 
-### ۶-۲ (لپ‌تاپ): پیدا کردن آی‌پی امروز
-
-```powershell
-ipconfig
-```
-
-عدد جلوی `IPv4 Address` مربوط به اتصال فعلی را یادداشت کن. از اینجا به بعد به آن می‌گوییم **`<LAPTOP_IP>`** (مثلاً `192.168.1.37`). این عدد هر جلسه ممکن است عوض شود؛ آن را در هیچ فایلی ذخیره نکن.
-
-### ۶-۳ (رزبری‌پای، SSH): شروع ارسال تصویر
-
-```bash
-cd ~/projects/real_time_cam
-uv run xerox-cam-push --mediamtx-host <LAPTOP_IP> --resolution 960x600 --fps-hz 30 --bitrate-kbps 2000 --encoder software_x264
-```
-
-**خروجی مورد انتظار:**
-- در SSH رزبری‌پای: چاپ دستور کامل `gst-launch-1.0 ...` و سپس `Setting pipeline to PLAYING ...`
-- در پنجره سرور رسانه روی لپ‌تاپ: `INF [path cam] [RTSP source] is publishing to path 'cam', 1 track (H264)`
-
-اگر می‌خواهی فقط دستور را ببینی بدون اجرا، به انتهای آن `--dry-run` اضافه کن.
-
-### ۶-۴ (لپ‌تاپ، پنجره PowerShell شماره ۲): روشن کردن بک‌اند و صفحه وب
+### Step 2 — Start the backend + web page (laptop, PowerShell window #2)
 
 ```powershell
-cd C:\Users\<نام کاربری>\Documents\configurator
+cd C:\Users\<username>\Documents\configurator
 uv run xerox-cam-backend
 ```
 
-**خروجی مورد انتظار:**
+Expected output:
 
 ```text
 INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
 ```
 
-این پنجره را هم **باز نگه دار**؛ بستن آن یعنی خاموش شدن صفحه وب برای همه.
+Keep this window open too — closing it takes the web page down for everyone.
 
-در اولین اجرا، فایل `configs\backend.toml` به‌طور خودکار با مقادیر استاندارد ساخته می‌شود (این فایل در `.gitignore` است، پس آی‌پی محلی هیچ‌وقت وارد گیت نمی‌شود). برای بررسی تنظیمات بدون روشن کردن سرور:
+### Step 3 — Start the camera stream (Raspberry Pi, SSH)
 
-```powershell
-uv run xerox-cam-backend --check-config
-```
-
-**خروجی مورد انتظار:**
-
-```text
-Config OK (configs\backend.toml): bind=0.0.0.0:8080, whep=/cam/whep, stream=960x600@30Hz
-```
-
-### ۶-۵ (مرورگر روی لپ‌تاپ): دیدن تصویر
-
-در مرورگر برو به:
-
-```text
-http://127.0.0.1:8080/
-```
-
-**خروجی مورد انتظار:** صفحه وب تیم باز می‌شود، تنظیمات را خودکار از بک‌اند می‌گیرد، خودکار وصل می‌شود و در کمتر از یک ثانیه نشان سبز «**پخش زنده**» را بالای تصویر می‌بینی.
-
-نشان بالای تصویر یعنی چه؟
-
-| نشان | معنی | اولین کار |
-| :--- | :--- | :--- |
-| «آماده اتصال» | صفحه باز شده اما هنوز وصل نشده | چند ثانیه صبر کن |
-| «در حال اتصال...» | در حال دست‌دادن با سرور رسانه است | اگر بیش از ۵ ثانیه ماند، پنجره سرور رسانه را چک کن |
-| «پخش زنده» | همه‌چیز درست است | لذت ببر! |
-| «خطای ارتباط» | یکی از سه بخش خاموش است | برو به [بخش ۱۱](#۱۱-عیب-یابی) |
-
----
-
-## ۷. تنظیمات تصویر (رزولوشن، نرخ فریم، بیت‌ریت)
-
-تنظیمات در فایل `configs\backend.toml` روی لپ‌تاپ ذخیره می‌شوند. دو راه داری:
-
-**راه اول (توصیه‌شده):** در PowerShell لپ‌تاپ، خواندن تنظیمات فعلی:
-
-```powershell
-Invoke-RestMethod -Uri http://127.0.0.1:8080/api/v1/config/stream
-```
-
-تغییر تنظیمات:
-
-```powershell
-Invoke-RestMethod -Method Put -Uri http://127.0.0.1:8080/api/v1/config/stream `
-  -ContentType "application/json" `
-  -Body '{"resolution":"1920x1200","fps_hz":25,"bitrate_kbps":3000,"encoder_kind":"software_x264"}'
-```
-
-و برگشت به تنظیمات استاندارد (`960x600 @ 30Hz @ 2000kbps`):
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8080/api/v1/config/stream/reset
-```
-
-**راه دوم:** فایل `configs\backend.toml` را با یک ویرایشگر متنی باز کن، مقدار را عوض کن و ذخیره کن.
-
-> **نکته مهم در این نسخه:** تغییر تنظیمات روی لپ‌تاپ فقط «ذخیره» می‌شود. برای اعمال شدن روی تصویر واقعی، باید دستور `xerox-cam-push` روی رزبری‌پای را با همان پارامترهای جدید یک بار متوقف (`Ctrl+C`) و دوباره اجرا کنی.
-
-محدودیت‌هایی که بک‌اند از پذیرش آن‌ها جلوگیری می‌کند:
-
-| تنظیم | مقدار مجاز |
-| :--- | :--- |
-| رزولوشن | فقط `960x600` یا `1920x1200` |
-| نرخ فریم (`fps_hz`) | بین `5` تا `60` |
-| بیت‌ریت (`bitrate_kbps`) | بین `300` تا `12000` |
-| انکودر | `software_x264` (همیشه مجاز) یا `hardware_v4l2` (فقط تا ارتفاع `1080`؛ روی `1920x1200` رد می‌شود) |
-
-اگر مقدار نامعتبر بفرستی، سرور پاسخ `422` با پیام دقیق می‌دهد و فایل تنظیمات دست‌نخورده باقی می‌ماند.
-
----
-
-## ۸. آدرسی که به بقیه تیم می‌دهی
-
-بقیه اعضای تیم فقط کافی است **در همان شبکه** (همان کابل LAN یا همان هات‌اسپات) باشند و در مرورگر لپ‌تاپ یا موبایل این آدرس را باز کنند:
-
-```text
-http://<LAPTOP_IP>:8080/
-```
-
-مثلاً:
-
-```text
-http://192.168.1.37:8080/
-```
-
-همین. آن‌ها نیازی به نصب `uv`، پایتون یا هیچ برنامه‌ای ندارند؛ فقط باید:
-
-1. به همان شبکه‌ای که لپ‌تاپ ایستگاه زمینی به آن وصل است وصل باشند (کابل یا وای‌فای هات‌اسپات).
-2. آدرس را **دقیقاً** با همان آی‌پی امروز وارد کنند (نه `localhost` و نه `127.0.0.1`؛ این دو فقط روی خود لپ‌تاپ کار می‌کنند).
-3. از مرورگرهای جدید استفاده کنند: Chrome، Edge یا Firefox.
-
-برای تماشای تمام‌صفحه، دکمه «**تمام‌صفحه**» بالای صفحه را بزنند.
-
-**نکته امنیتی:** این صفحه روی شبکه محلی باز است و فعلاً رمز ندارد؛ پس فقط در شبکه داخلی تیم استفاده‌اش کن.
-
----
-
-## ۹. حالت نمایشی بدون دوربین و بدون رزبری‌پای
-
-اگر رزبری‌پای یا دوربین در دسترس نیست (مثلاً می‌خواهی فقط صفحه وب را به تیم نشان بدهی)، روی همان لپ‌تاپ ویندوز یک تصویر آزمایشی متحرک بساز. شرط: بسته GStreamer روی ویندوز نصب باشد (`gst-launch-1.0 --version`).
-
-در یک پنجره PowerShell دیگر:
-
-```powershell
-gst-launch-1.0 -e videotestsrc is-live=true pattern=ball ! video/x-raw,width=960,height=600,framerate=30/1,format=I420 ! x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 key-int-max=30 ! video/x-h264,profile=baseline ! h264parse ! rtspclientsink location=rtsp://127.0.0.1:8554/cam protocols=tcp latency=0
-```
-
-**خروجی مورد انتظار:** در پنجره سرور رسانه پیام `is publishing to path 'cam', 1 track (H264)` و در مرورگر یک توپ سفید متحرک با حرکت کاملاً روان. این بهترین راه برای سنجش چشمی تأخیر بدون درگیر شدن با سخت‌افزار است.
-
----
-
-## ۱۰. جدول پورت‌ها
-
-| پورت | پروتکل | کدام برنامه | چه کسی به آن وصل می‌شود |
-| :--- | :--- | :--- | :--- |
-| `8554` | TCP | سرور رسانه (ورودی تصویر) | رزبری‌پای |
-| `8000` / `8001` | UDP | سرور رسانه (RTP / RTCP) | رزبری‌پای |
-| `8889` | TCP | سرور رسانه (WebRTC) | مرورگرهای تیم |
-| `8189` | UDP | سرور رسانه (بسته‌های تصویر) | مرورگرهای تیم |
-| `8888` | TCP | سرور رسانه (پخش پشتیبان HLS) | مرورگر (در صورت نیاز) |
-| `8080` | TCP | بک‌اند (صفحه وب + API) | مرورگرهای تیم |
-
-پورت UDP `5000` روی لپ‌تاپ تیم اشغال است؛ هیچ‌کدام از پورت‌های بالا با آن تداخل ندارند.
-
----
-
-## ۱۱. عیب‌یابی
-
-| نشانه | علت احتمالی | رفع |
-| :--- | :--- | :--- |
-| مرورگر می‌گوید `This site can't be reached` | بک‌اند خاموش است یا آی‌پی اشتباه است | `uv run xerox-cam-backend` را اجرا کن و آی‌پی را با `ipconfig` دوباره چک کن |
-| صفحه باز می‌شود اما «خطای ارتباط» | سرور رسانه خاموش است یا تصویری منتشر نمی‌شود | پنجره شماره ۱ را چک کن: باید ۵ خط `INF` را نشان دهد و پیام `is publishing to path 'cam'` در آن باشد |
-| روی «در حال اتصال...» می‌ماند | پورت `8889` یا `8189` در فایروال بسته است | دستورهای [بخش ۴-۵](#۴-۵-باز-کردن-پورت-ها-در-فایروال-ویندوز) را با دسترسی Administrator دوباره اجرا کن |
-| رزبری‌پای خطای `Could not open device` می‌دهد | دوربین روی پورت USB 2.0 است یا دستگاه `/dev/video1` نیست | کابل را به پورت آبی منتقل کن؛ با `v4l2-ctl --list-devices` شماره را چک کن و با `--device /dev/videoX` بده |
-| پیام `is publishing` در سرور رسانه نمی‌آید | آی‌پی در `--mediamtx-host` اشتباه است یا پورت `8554` بسته است | `ipconfig` را دوباره بخوان و قانون فایروال را چک کن |
-| `Only one usage of each socket address is normally permitted` | یک نسخه دیگر `mediamtx.exe` باز مانده | `Stop-Process -Name mediamtx` |
-| بک‌اند می‌گوید پورت `8080` در حال استفاده است | یک سرور دیگر روی این پورت باز است | آن پنجره را با `Ctrl+C` ببند، یا با `--port 8081` اجرا کن |
-| پاسخ `422` هنگام تغییر تنظیمات | ترکیب نامعتبر (مثلاً `1920x1200` با `hardware_v4l2`) | جدول [بخش ۷](#۷-تنظیمات-تصویر-رزولوشن-نرخ-فریم-بیت-ریت) را رعایت کن |
-| تصویر با تأخیر چندثانیه‌ای می‌آید | شبکه شلوغ یا بافر اضافی | کابل LAN را به هات‌اسپات ترجیح بده؛ در پروژه تنظیم `latency=0` پیش‌فرض است |
-| روی لپ‌تاپ هست اما روی موبایل نه | موبایل به شبکه دیگری وصل است یا `http://` جلوی آدرس نیست | مطمئن شو موبایل به همان شبکه وصل است و آدرس با `http://` شروع می‌شود |
-
----
-
-## ۱۲. چک‌لیست پایانی (قبل از گفتن «اوکی شد»)
-
-- [ ] ملخ‌ها جدا هستند (قانون طلایی).
-- [ ] پنجره سرور رسانه روی لپ‌تاپ ۵ خط `INF` را نشان می‌دهد و پیام `is publishing to path 'cam', 1 track (H264)` در آن هست.
-- [ ] `uv run xerox-cam-backend` در حال اجراست و پیام `Uvicorn running on http://0.0.0.0:8080` را نشان می‌دهد.
-- [ ] روی لپ‌تاپ ایستگاه زمینی، آدرس `http://127.0.0.1:8080/` تصویر زنده با نشان سبز نشان می‌دهد.
-- [ ] روی **یک دستگاه دیگر تیم** در همان شبکه، آدرس `http://<LAPTOP_IP>:8080/` همان تصویر را نشان می‌دهد.
-- [ ] تأخیر زیر یک ثانیه است (کرنومتر موبایل را جلوی دوربین بگیر و اختلاف را با تصویر لپ‌تاپ مقایسه کن).
-
----
-
-## ۱۳. پرسش‌های پرتکرار
-
-**۱. آیا برای دیدن تصویر باید اینترنت داشته باشیم؟**
-خیر. کل سیستم روی شبکه محلی کار می‌کند و به اینترنت، CDN یا سرور خارجی وابسته نیست. اینترنت فقط برای نصب اولیه (`uv` و `MediaMTX`) لازم است.
-
-**۲. چرا آی‌پی را در فایل‌ها ذخیره نمی‌کنیم؟**
-چون آی‌پی با عوض شدن شبکه تغییر می‌کند و یک مقدار قدیمی، روز تست کل سیستم را خراب می‌کند. همه‌چیز از فایل `configs\backend.toml` یا آرگومان خط فرمان (`--mediamtx-host`) خوانده می‌شود.
-
-**۳. چند نفر می‌توانند هم‌زمان ببینند؟**
-هر تعداد که روی همان شبکه باشند. فقط حواست باشد پهنای باند هات‌اسپات موبایل با چند بیننده‌ی هم‌زمان ممکن است پر شود.
-
-**۴. چرا تصویر در مرورگر خودکار وصل می‌شود؟**
-چون صفحه وب هنگام بارگذاری تنظیمات را از مسیر `/api/v1/config` بک‌اند می‌گیرد و آدرس پخش را خودش می‌سازد؛ فقط کافی است صفحه را باز کنی.
-
-**۵. اگر لپ‌تاپ ایستگاه زمینی عوض شد چه کنیم؟**
-هیچ چیز در کد تغییر نمی‌دهی؛ فقط [بخش ۴](#۴-آماده-سازی-یک-باره-روی-لپ-تاپ-ویندوز) را روی لپ‌تاپ جدید تکرار کن و آی‌پی جدید را به تیم بده.
-
----
-
-## ۱۴. پیوست: بلوک کپی‌پیست کامل
-
-**لپ‌تاپ ویندوز (سه پنجره PowerShell، به ترتیب):**
-
-```powershell
-# پنجره ۱: سرور رسانه
-cd C:\Users\<نام کاربری>\Documents\configurator
-.\bin\mediamtx.exe .\configs\mediamtx.yml
-```
-
-```powershell
-# پنجره ۲: بک‌اند و صفحه وب
-cd C:\Users\<نام کاربری>\Documents\configurator
-uv run xerox-cam-backend
-```
-
-```powershell
-# پنجره ۳: پیدا کردن آی‌پی برای دادن به تیم
-ipconfig
-```
-
-**رزبری‌پای (SSH):**
+Find the laptop's current IP first (`ipconfig` on the laptop), then:
 
 ```bash
 cd ~/projects/real_time_cam
 uv run xerox-cam-push --mediamtx-host <LAPTOP_IP> --resolution 960x600 --fps-hz 30 --bitrate-kbps 2000 --encoder software_x264
 ```
 
-**آدرس‌ها در مرورگر:**
+Expected output: the printed `gst-launch-1.0 ...` command followed by `Setting pipeline to PLAYING ...`, and in the
+MediaMTX window a new line:
 
-| جا | آدرس |
+```text
+INF [path cam] [RTSP source] is publishing to path 'cam', 1 track (H264)
+```
+
+### Step 4 — Open the URL
+
+| Where | URL |
 | :--- | :--- |
-| روی لپ‌تاپ ایستگاه زمینی | `http://127.0.0.1:8080/` |
-| روی بقیه دستگاه‌های تیم | `http://<LAPTOP_IP>:8080/` |
-| تست مستقیم پخش (بدون صفحه‌ی ما) | `http://<LAPTOP_IP>:8889/cam/` |
-| پخش پشتیبان (تأخیر بیشتر) | `http://<LAPTOP_IP>:8888/cam/` |
+| On the ground-station laptop | `http://127.0.0.1:8080/` |
+| On any other team device on the same network | `http://<LAPTOP_IP>:8080/` |
+| Direct WebRTC test page (our UI not involved) | `http://<LAPTOP_IP>:8889/cam/` |
+| HLS fallback (higher latency) | `http://<LAPTOP_IP>:8888/cam/` |
 
-**نمونه فایل `configs\backend.toml` (در اولین اجرا خودکار ساخته می‌شود):**
+The page connects automatically. A green **LIVE** badge over the video means everything works.
 
-```toml
-[server]
-host = "0.0.0.0"
-port = 8080
+> The UI is Persian/RTL with English technical labels. The status badge reads
+> «پخش زنده» = *LIVE*, «در حال اتصال...» = *Connecting…*, «آماده اتصال» = *Ready*, «خطای ارتباط» = *Connection error*.
 
-[mediamtx]
-# خالی یعنی: سرور رسانه روی همین لپ‌تاپ اجرا می‌شود و مرورگر از همان نشانی استفاده کند.
-public_host = ""
-rtsp_port = 8554
-webrtc_http_port = 8889
-stream_path = "cam"
+### Stop / restart order
 
-[stream]
-resolution = "960x600"
-fps_hz = 30
-bitrate_kbps = 2000
-encoder_kind = "software_x264"
+Stop with `Ctrl+C` in this order: Pi push → backend → MediaMTX. To restart after a network unplug, repeat steps 1–4.
+
+---
+
+## 2. Requirements
+
+| Item | Requirement |
+| :--- | :--- |
+| Ground station | Windows 10/11 laptop |
+| Onboard computer | Raspberry Pi 4 (`xerox@XeroxUAV`, Debian 13 `aarch64`, Python 3.13) |
+| Camera | Arducam B0495 on a **blue USB 3.0 port** (a black USB 2.0 port drops the camera to 10 fps) |
+| Network | LAN cable between laptop and Pi, or a phone hotspot; both devices on the same network |
+| Laptop software | `uv`, this repo, `bin\mediamtx.exe`, firewall rules (once) |
+| Pi software | GStreamer 1.26+ with `ugly`, `bad`, `rtsp` plugins, `v4l-utils`, this repo |
+| Viewers | Any modern Chrome, Edge, or Firefox — no install needed |
+
+---
+
+## 3. One-time setup
+
+### 3.1 Windows laptop
+
+```powershell
+# 1) Install uv (close and reopen PowerShell afterwards)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+uv --version
+```
+
+```powershell
+# 2) Install project dependencies (internet needed only here)
+cd C:\Users\<username>\Documents\configurator
+uv sync --locked --dev
+```
+
+```powershell
+# 3) Download the media server (MediaMTX v1.21.3)
+New-Item -ItemType Directory -Force -Path .\bin | Out-Null
+Invoke-WebRequest -Uri "https://github.com/bluenviron/mediamtx/releases/download/v1.21.3/mediamtx_v1.21.3_windows_amd64.zip" -OutFile .\bin\mediamtx.zip
+Expand-Archive -Force -Path .\bin\mediamtx.zip -DestinationPath .\bin
+Unblock-File -Path .\bin\mediamtx.exe
+.\bin\mediamtx.exe --version      # -> v1.21.3
+```
+
+```powershell
+# 4) Open the firewall ports once, in an Administrator PowerShell
+New-NetFirewallRule -DisplayName "XeroxUAV Camera TCP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8554,8888,8889,8080 -Profile Any
+New-NetFirewallRule -DisplayName "XeroxUAV Camera UDP" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 8000,8001,8189 -Profile Any
+```
+
+If Windows shows *“Windows protected your PC”*, click **More info → Run anyway**.
+Port `8080` is the web page; `-Profile Any` is required because Windows often marks hotspots as *Public*.
+
+### 3.2 Raspberry Pi
+
+```bash
+# 1) Verify the camera (expect 'YUYV' with 960x600 @ 80 fps and 1920x1200 @ 50 fps)
+v4l2-ctl --device=/dev/video1 --list-formats-ext
+```
+
+If you only see `960x600 @ 10.000 fps`, the camera is on a USB 2.0 port — move it to a **blue USB 3.0** port.
+
+```bash
+# 2) Install system packages (once)
+sudo apt update && sudo apt install -y v4l-utils gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-rtsp
+```
+
+```bash
+# 3) Copy this repo to the Pi (from the laptop)
+#    scp "$HOME\Downloads\real_time_cam.zip" xerox@XeroxUAV:~/
+mkdir -p ~/projects/real_time_cam
+tar -xzf ~/real_time_cam.zip -C ~/projects/real_time_cam --strip-components=1
+cd ~/projects/real_time_cam
+uv sync --dev
 ```
 
 ---
 
-## ۱۵. برای توسعه‌دهنده‌ها
+## 4. Configuration
 
-اگر می‌خواهی روی خودِ کد کار کنی (نه فقط اجرایش)، در پوشه پروژه:
+Stream settings live in `configs\backend.toml` on the laptop (created automatically on first run; git-ignored, so a
+local IP never ends up in git). Read or change them while the backend is running:
+
+```powershell
+# Read current settings
+Invoke-RestMethod -Uri http://127.0.0.1:8080/api/v1/config/stream
+
+# Apply new settings
+Invoke-RestMethod -Method Put -Uri http://127.0.0.1:8080/api/v1/config/stream `
+  -ContentType "application/json" `
+  -Body '{"resolution":"1920x1200","fps_hz":25,"bitrate_kbps":3000,"encoder_kind":"software_x264"}'
+
+# Restore defaults (960x600 @ 30 Hz @ 2000 kbps)
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8080/api/v1/config/stream/reset
+```
+
+> **Current behaviour:** saving settings only *persists* them. To make them take effect on the live video, stop
+> (`Ctrl+C`) and re-run the `xerox-cam-push` command on the Pi with the same new values.
+
+### Valid ranges (enforced by the backend)
+
+| Setting | Allowed values |
+| :--- | :--- |
+| `resolution` | `960x600` or `1920x1200` |
+| `fps_hz` | `5` – `60` |
+| `bitrate_kbps` | `300` – `12000` |
+| `encoder_kind` | `software_x264` (always) or `hardware_v4l2` (heights up to `1080` only) |
+
+Invalid combinations are rejected with HTTP `422` and the file is left untouched.
+
+### Ports
+
+| Port | Protocol | Service | Who connects |
+| :--- | :--- | :--- | :--- |
+| `8554` | TCP | MediaMTX RTSP ingest | Raspberry Pi |
+| `8000` / `8001` | UDP | MediaMTX RTP / RTCP | Raspberry Pi |
+| `8889` | TCP | MediaMTX WebRTC (WHEP) | Browsers |
+| `8189` | UDP | MediaMTX ICE media | Browsers |
+| `8888` | TCP | MediaMTX HLS fallback | Browsers |
+| `8080` | TCP | Backend (web UI + API) | Browsers |
+
+None of these collide with UDP port `5000`, which is occupied on the team laptop.
+
+---
+
+## 5. Demo mode (no camera, no Raspberry Pi)
+
+To show the pipeline on the Windows laptop alone (requires GStreamer on Windows):
+
+```powershell
+gst-launch-1.0 -e videotestsrc is-live=true pattern=ball ! video/x-raw,width=960,height=600,framerate=30/1,format=I420 ! x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 key-int-max=30 ! video/x-h264,profile=baseline ! h264parse ! rtspclientsink location=rtsp://127.0.0.1:8554/cam protocols=tcp latency=0
+```
+
+Expected: `is publishing to path 'cam', 1 track (H264)` in the MediaMTX window, and a smoothly moving white ball in
+the browser — the easiest way to eyeball latency without hardware.
+
+---
+
+## 6. Acceptance checklist
+
+- [ ] Propellers removed (Golden Propeller Rule).
+- [ ] MediaMTX window shows the 5 `INF` startup lines **and** `is publishing to path 'cam', 1 track (H264)`.
+- [ ] `uv run xerox-cam-backend` is running and prints `Uvicorn running on http://0.0.0.0:8080`.
+- [ ] `http://127.0.0.1:8080/` on the laptop shows the live video with the LIVE badge.
+- [ ] `http://<LAPTOP_IP>:8080/` on **another** device on the same network shows the same video.
+- [ ] Measured glass-to-glass latency is under one second (hold a phone stopwatch in front of the camera and compare).
+
+---
+
+## 7. Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| :--- | :--- | :--- |
+| `This site can't be reached` | Backend is down or wrong IP | Run `uv run xerox-cam-backend`; re-check the IP with `ipconfig` |
+| Page opens but shows *Connection error* | MediaMTX down, or nothing publishing | Check window #1 for the 5 `INF` lines and `is publishing to path 'cam'` |
+| Stuck on *Connecting…* | Firewall blocks `8889` / `8189` | Re-run the firewall commands in [3.1](#31-windows-laptop) as Administrator |
+| Pi: `Could not open device` | Camera on a USB 2.0 port or wrong `/dev/videoX` | Move to a blue USB 3.0 port; check `v4l2-ctl --list-devices`, pass `--device /dev/videoX` |
+| No `is publishing` message | Wrong `--mediamtx-host` IP or port `8554` blocked | Re-read `ipconfig`; verify the firewall rule |
+| `Only one usage of each socket address is normally permitted` | Another `mediamtx.exe` is already open | `Stop-Process -Name mediamtx` |
+| Backend: port `8080` already in use | Another server holds it | Close it, or run with `--port 8081` |
+| HTTP `422` when saving settings | Invalid combination (e.g. `1920x1200` + `hardware_v4l2`) | Use the ranges in [section 4](#4-configuration) |
+| Video works on the laptop but not on phones | Phone on a different network, or missing `http://` | Join the same network and type the full `http://<LAPTOP_IP>:8080/` |
+
+---
+
+## 8. FAQ
+
+**Does this need internet?** No. Everything runs on the local network with no CDN or external server. Internet is
+only needed for the one-time install of `uv` and `MediaMTX`.
+
+**Why is the IP never stored in a file?** Because it changes with every network, and a stale IP breaks a test day.
+Everything is read from `configs\backend.toml` or a CLI argument (`--mediamtx-host`).
+
+**How many people can watch at once?** As many as the network carries; MediaMTX fans the stream out to all viewers.
+Phone hotspots may saturate with several simultaneous viewers — prefer a LAN cable.
+
+**Why does the page connect by itself?** On load, the page fetches `/api/v1/config` from the backend and builds the
+WHEP URL from it, so there is nothing to fill in.
+
+**What if we change the ground-station laptop?** Nothing in the code changes; repeat [section 3.1](#31-windows-laptop)
+and hand out the new IP.
+
+---
+
+## 9. For developers
 
 ```bash
 uv sync --locked --dev
 uv run ruff format --check .
 uv run ruff check .
 uv run ty check
-uv run pytest
+uv run pytest          # 76 passed, 97.83% branch coverage
 ```
 
-**خروجی مورد انتظار:** تمام بررسی‌ها `All checks passed` و تست‌ها سبز (`76 passed` با پوشش شاخه‌ای بالای ۹۰٪).
-
-ساختار پوشه‌ها (معماری شش‌ضلعی):
+Layout (hexagonal architecture — dependencies point inwards, `domain/` imports no framework):
 
 ```text
 src/real_time_cam/
-├── domain/          قلب برنامه: قوانین و موجودیت‌های خالص (بدون هیچ وابستگی به فریم‌ورک)
-├── application/     سناریوهای استفاده (مثل ذخیره و بازیابی تنظیمات)
-├── infrastructure/  ارتباط با دنیای بیرون (فایل TOML، GStreamer، WebSocket)
-└── presentation/    ورودی/خروجی کاربر (بک‌اند FastAPI، صفحه وب، خط فرمان رزبری‌پای)
+├── domain/          pure rules and frozen entities (no frameworks)
+├── application/     use cases (e.g. load/persist stream configuration)
+├── infrastructure/  TOML persistence, GStreamer encoders, system metrics
+└── presentation/    FastAPI backend, web UI, Raspberry Pi CLI
 ```
 
-آموزش کامل و گام‌به‌گامِ مفاهیم (از صفر، به فارسی) در پوشه `docs/` همین مخزن است؛ از `docs/00-overview.md` شروع کن.
+| Entry point | Purpose |
+| :--- | :--- |
+| `xerox-cam-backend` | FastAPI server: serves the web UI and the `/api/v1` REST API on port `8080` |
+| `xerox-cam-push` | Captures the camera, encodes H.264, and pushes RTSP to MediaMTX |
+| `xerox-cam-benchmark` | Measures fps/CPU/temperature for both encoders on the Pi |
 
----
+REST API: `GET /api/v1/health`, `GET /api/v1/config`, `GET|PUT /api/v1/config/stream`,
+`POST /api/v1/config/stream/reset`.
 
-با خطایی روبه‌رو شدی که اینجا نیست؟ خروجی کامل پنجره سرور رسانه و پنجره بک‌اند را کپی کن و برای مسئول نرم‌افزار تیم بفرست.
-#   c a m - c o n f i n g 
- 
- 
+A detailed, Persian, step-by-step explanation of every concept lives in [`docs/`](docs/00-overview.md).
